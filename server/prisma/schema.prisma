@@ -1,0 +1,85 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         Int      @id @default(autoincrement())
+  numberCall String   @unique
+  password   String?
+  name       String?
+  picture    String?
+  credit     Float?
+  role       String   @default("user")
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  bets       Bet[]
+  topUps     TopUp[]
+}
+
+model TopUp {
+  id        Int         @id @default(autoincrement())
+  amount    Float
+  slipUrl   Bytes?
+  status    TopUpStatus @default(PENDING)
+  user      User        @relation(fields: [userId], references: [id])
+  userId    Int
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+}
+
+enum TopUpStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Bet {
+  id         Int      @id @default(autoincrement())
+  user       User     @relation(fields: [userId], references: [id])
+  userId     Int
+  groupLotto String
+  gameType   String
+  amount     Float
+  number     String // เก็บตัวเลขที่แทง
+  payout     Float? // จำนวนเงินที่ได้ (null ถ้ายังไม่ได้ออกรางวัล)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  resultId   Int? // เชื่อมโยงกับผลรางวัล
+  result     Result?  @relation(fields: [resultId], references: [id])
+}
+
+model Result {
+  id            Int      @id @default(autoincrement())
+  lotteryName   String
+  winningNumber String
+  threeDigit    String
+  twoDigit      String
+  twoDigitLower String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  round         Int
+  date          DateTime // เพิ่มฟิลด์ date
+  Bet           Bet[]
+}
+
+model Lottery {
+  id           Int      @id @default(autoincrement())
+  name         String
+  openDate     DateTime
+  closeDate    DateTime
+  openDays     Json
+  autoOpenNext Boolean
+  openTime     String? // ฟิลด์นี้ต้องเป็น String หรือ Type อื่น ๆ ขึ้นอยู่กับที่คุณต้องการ
+}
