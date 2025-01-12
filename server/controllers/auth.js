@@ -2,6 +2,10 @@ const prisma = require("../config/prisma");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 
+const {
+  getActiveLotteries,
+} = require("./Loto");
+
 exports.checkAndCreateDefaultUser = async () => {
   try {
     const user = await prisma.user.findFirst();
@@ -252,23 +256,43 @@ exports.create = async (req, res) => {
       return res.status(404).json({ error: "User not found" });
     }
 
-    // สร้าง Bet สำหรับแต่ละหมายเลขใน numbers
-    const bets = await prisma.bet.createMany({
-      data: numbers.map((num) => ({
+    // ดึงข้อมูลลอตเตอรี่ที่เปิดอยู่
+    const activeLotteries = await getActiveLotteries(); // สมมติว่ามีฟังก์ชัน getActiveLotteries()
+
+    // ตรวจสอบและสร้าง Bet
+    const betsData = numbers
+      .filter((num) => {
+        // ตรวจสอบว่า groupLotto มีอยู่ใน activeLotteries หรือไม่
+        const exists = activeLotteries.some((lottery) => lottery.name === num.groupLotto);
+        if (!exists) {
+          console.log(`GroupLotto ${num.groupLotto} ไม่ได้เปิดอยู่`);
+        }
+        return exists; // กรองเฉพาะ groupLotto ที่มีอยู่
+      })
+      .map((num) => ({
         userId: user.id, // เชื่อมโยงกับ user ผ่าน userId
         groupLotto: num.groupLotto,
-        number: num.number, // ดึงหมายเลขจาก numbers
-        gameType: num.gameType, // ดึง gameType จาก numbers
-        amount: num.amount, // แปลง amount ที่ส่งมา
-      })),
+        number: num.number,
+        gameType: num.gameType,
+        amount: num.amount,
+      }));
+
+    if (betsData.length === 0) {
+      return res.status(400).json({ error: "No valid bets to create" });
+    }
+
+    // สร้าง Bet ในฐานข้อมูล
+    const bets = await prisma.bet.createMany({
+      data: betsData,
     });
 
     return res.json({ success: true, bets }); // ส่งกลับข้อมูลที่สร้างใหม่
   } catch (err) {
-    console.log(err);
+    console.error("Error creating bets:", err);
     res.status(500).json({ message: "Server Error" });
   }
 };
+
 
 exports.list = async (req, res) => {
   try {

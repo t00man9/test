@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import useTigetStore from "../../store/tiget.store";
 import { useNavigate } from "react-router-dom";
-import { fetchLotteriesAPI, toggleEnabledLoto } from "../../api/Loto"; // เรียกใช้ toggleEnabledLoto จาก API
+import { fetchLotteriesAPIActive, toggleEnabledLoto } from "../../api/Loto"; // เรียกใช้ toggleEnabledLoto จาก API
 import { toast } from "react-toastify";
 import dayjs from "dayjs";
 
@@ -21,56 +21,72 @@ const HomeUser = () => {
 
   const getLotto = async (token) => {
     try {
-      const res = await fetchLotteriesAPI(token);
-      console.log("999", res);
-
-      const lotteriesWithTime = res.data.lotteries.map((lotto) => ({
-        ...lotto,
-        remainingTime: calculateRemainingTime(lotto),
-      }));
-      console.log("lotteriesWithTime", lotteriesWithTime);
-
-      setLotteries(lotteriesWithTime);
+      const res = await fetchLotteriesAPIActive(token);
+      console.log("API Response:", res); // ตรวจสอบข้อมูลที่ได้รับ
+  
+      // ตรวจสอบว่ามีข้อมูล activeLotteries หรือไม่
+      if (res?.data?.activeLotteries) {
+        const lotteriesWithTime = res.data.activeLotteries.map((lotto) => ({
+          ...lotto,
+          remainingTime: calculateRemainingTime(lotto), // คำนวณเวลาที่เหลือ
+        }));
+        console.log("lotteriesWithTime", lotteriesWithTime);
+        setLotteries(lotteriesWithTime); // อัปเดต state
+      } else {
+        throw new Error("ไม่มีข้อมูลหวยที่ใช้งาน");
+      }
     } catch (error) {
-      console.log(error);
+      console.error("Error fetching lotteries:", error);
       toast.error("ไม่สามารถดึงข้อมูลหวยได้");
     }
   };
+  
 
-  const updateLotteryStatus = async (id) => {
-    try {
-      await toggleEnabledLoto(token, id, { isOpen: false }); // ปิดสถานะ
-      setLotteries((prevLotteries) =>
-        prevLotteries.map((lotto) =>
-          lotto.id === id
-            ? { ...lotto, isOpen: false, remainingTime: "ปิดแล้ว" }
-            : lotto
-        )
-      );
-      toast.success(`อัปเดตสถานะหวย ID ${id} เป็นปิดเรียบร้อยแล้ว`);
-    } catch (error) {
-      console.log(error);
-      toast.error("ไม่สามารถอัปเดตสถานะหวยได้");
-    }
-  };
+  // const updateLotteryStatus = async (id) => {
+  //   try {
+  //     await toggleEnabledLoto(token, id, { isOpen: false }); // ปิดสถานะ
+  //     setLotteries((prevLotteries) =>
+  //       prevLotteries.map((lotto) =>
+  //         lotto.id === id
+  //           ? { ...lotto, isOpen: false, remainingTime: "ปิดแล้ว" }
+  //           : lotto
+  //       )
+  //     );
+  //     toast.success(`อัปเดตสถานะหวย ID ${id} เป็นปิดเรียบร้อยแล้ว`);
+  //   } catch (error) {
+  //     console.log(error);
+  //     toast.error("ไม่สามารถอัปเดตสถานะหวยได้");
+  //   }
+  // };
 
   const calculateRemainingTime = (lotto) => {
     const now = dayjs();
-    const end = dayjs(lotto.closeTime);
-    const duration = end.diff(now, "second");
-
-    if (duration <= 0 && lotto.isOpen) {
-      // ถ้าเวลาปิดแล้วและยัง enabled อยู่ ให้ส่ง API ไปปิด
-      updateLotteryStatus(lotto.id);
+    const today = dayjs().format("YYYY-MM-DD");
+    const openTime = dayjs(`${today}T${lotto.openTime}`);
+    const closeTime = dayjs(`${today}T${lotto.closeTime}`);
+  
+    let remainingDuration;
+  
+    if (now.isBefore(openTime)) {
+      // หากยังไม่ถึงเวลาเปิด
+      remainingDuration = openTime.diff(now, "second");
+    } else if (now.isBefore(closeTime)) {
+      // หากอยู่ในช่วงเวลาเปิด
+      remainingDuration = closeTime.diff(now, "second");
+    } else {
+      // เวลาปิดแล้ว
       return "ปิดแล้ว";
     }
-
-    const hours = Math.floor(duration / 3600);
-    const minutes = Math.floor((duration % 3600) / 60);
-    const seconds = duration % 60;
-
-    return `${hours}:${minutes}:${seconds}`;
+  
+    const hours = Math.floor(remainingDuration / 3600);
+    const minutes = Math.floor((remainingDuration % 3600) / 60);
+    const seconds = remainingDuration % 60;
+  
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${seconds.toString().padStart(2, "0")}`;
   };
+  
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -81,11 +97,9 @@ const HomeUser = () => {
         }))
       );
     }, 1000); // อัปเดตทุก 1 วินาที
-
-    return () => {
-      clearInterval(interval);
-    };
-  }, []);
+  
+    return () => clearInterval(interval);
+  }, []);  
 
   const LotteryCard = ({
     title,
@@ -94,6 +108,7 @@ const HomeUser = () => {
     closeTime,
     enabled,
     onClick,
+    openDays,
   }) => (
     <button
       onClick={() => {
@@ -107,26 +122,21 @@ const HomeUser = () => {
       }`}
     >
       <h3 className="text-blue-600 font-semibold">{title}</h3>
-      <p
-        className={`${
-          remainingTime === "ปิดแล้ว" || !enabled
-            ? "text-red-600"
-            : "text-green-600"
-        }`}
-      >
-        เวลาที่เหลือ:{" "}
-        {enabled ? calculateRemainingTime : "ปิดรับแทงแล้ว (ผลออกแล้ว)"}
+      <p className={remainingTime === "ปิดแล้ว" ? "text-red-600" : "text-green-600"}>
+        เวลาที่เหลือ: {remainingTime}
       </p>
+      <p>เวลาเปิด: {openTime}</p>
       <p>เวลาปิด: {closeTime}</p>
+      {/* <p>เปิดวัน: {openDays.join(", ")}</p> */}
     </button>
   );
-
+  
   return (
     <div className="home">
       <main className="mt-6 space-y-6 max-w-screen ">
         <div className="bg-white p-6 rounded shadow space-y-4">
           <h2 className="text-blue-800 font-bold">หวยออนไลน์</h2>
-          <div className="flex space-x-4">
+          <div className="flex flex-wrap gap-4">
             {lotteries.map((lotto) => (
               <LotteryCard
                 key={lotto.id}
@@ -134,8 +144,9 @@ const HomeUser = () => {
                 openTime={lotto.openTime}
                 closeTime={lotto.closeTime}
                 remainingTime={lotto.remainingTime}
-                enabled={lotto.isOpen}
-                onClick={() => handleAddGroup(lotto.name)} // ส่ง onClick
+                enabled={lotto.active}
+                openDays={lotto.openDays}
+                onClick={() => handleAddGroup(lotto.name)}
               />
             ))}
           </div>

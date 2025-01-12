@@ -77,9 +77,10 @@ model Result {
 model Lottery {
   id           Int      @id @default(autoincrement())
   name         String
-  openDate     DateTime
-  closeDate    DateTime
+  openTime     String
+  closeTime    String
   openDays     Json
-  autoOpenNext Boolean
-  openTime     String? // ฟิลด์นี้ต้องเป็น String หรือ Type อื่น ๆ ขึ้นอยู่กับที่คุณต้องการ
+  group        String
+  type         String
+  active       Boolean
 }

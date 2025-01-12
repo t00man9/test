@@ -1,6 +1,32 @@
 const prisma = require("../config/prisma");
 const { PrismaClient } = require("@prisma/client");
 
+const isWithinLotterySchedule = (lottery, currentDate) => {
+  const start = new Date(lottery.openTime);
+  const end = new Date(lottery.closeTime);
+  const current = new Date(currentDate);
+
+  const dayOfWeek = current.getDay(); // คืนค่าหมายเลขของวัน (0 = อาทิตย์, 1 = จันทร์, ... 6 = เสาร์)
+
+  // แปลงชื่อวันใน openDays เป็นหมายเลขของวัน
+  const dayMapping = {
+    Sunday: 0,
+    Monday: 1,
+    Tuesday: 2,
+    Wednesday: 3,
+    Thursday: 4,
+    Friday: 5,
+    Saturday: 6,
+  };
+  const validDays = lottery.openDays.map((day) => dayMapping[day]);
+
+  // ตรวจสอบเงื่อนไข
+  const isInRange = current >= start && current <= end;
+  const isValidDay = validDays.includes(dayOfWeek);
+
+  return isInRange && isValidDay;
+};
+
 exports.updateLotteryStatus = async () => {
   try {
     const now = new Date();
@@ -50,15 +76,17 @@ exports.updateLotteryStatus = async () => {
 
 exports.createLottery = async (req, res) => {
   try {
-    const { name, openDate, closeDate, openDays, autoOpenNext } = req.body;
-
+    const { name, openTime, closeTime, openDays, group, type, active } = req.body;
+    console.log(type)
     const newLottery = await prisma.lottery.create({
       data: {
         name,
-        openDate: new Date(openDate),
-        closeDate: new Date(closeDate),
+        openTime,
+        closeTime,
         openDays,
-        autoOpenNext,
+        group,
+        type,
+        active: true,
       },
     });
 
@@ -201,5 +229,83 @@ exports.getLotteries = async (req, res) => {
   } catch (error) {
     console.error("Error fetching lotteries:", error);
     res.status(500).json({ error: "Error fetching lotteries" });
+  }
+};
+
+exports.getActiveLotteries = async () => {
+  try {
+    const now = new Date();
+
+    // ดึงวันปัจจุบันใน Timezone ไทย
+    const currentDay = now.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Bangkok" });
+
+    // ดึงเวลาปัจจุบันในรูปแบบ "HH:mm:ss"
+    const currentTime = now.toLocaleTimeString("en-US", {
+      hour12: false,
+      timeZone: "Asia/Bangkok",
+    });
+
+    // ดึงลอตเตอรี่ทั้งหมด
+    const lotteries = await prisma.lottery.findMany();
+
+    // กรองข้อมูลลอตเตอรี่ที่เปิดอยู่
+    const activeLotteries = lotteries.filter((lottery) => {
+      const openDays = lottery.openDays; // ค่านี้เป็น JSON
+      return (
+        Array.isArray(openDays) &&
+        openDays.includes(currentDay) && // ตรวจสอบวัน
+        lottery.openTime <= currentTime && // ตรวจสอบเวลาเปิด
+        lottery.closeTime >= currentTime   // ตรวจสอบเวลาปิด
+      );
+    });
+
+    return activeLotteries;
+  } catch (error) {
+    console.error("Error fetching active lotteries:", error);
+    throw new Error("Error fetching active lotteries");
+  }
+};
+
+
+exports.getAPIActiveLotteries = async (req, res) => {
+  try {
+    const now = new Date();
+
+    // ดึงวันปัจจุบันใน Timezone ไทย
+    const currentDay = now.toLocaleDateString("en-US", { weekday: "long", timeZone: "Asia/Bangkok" });
+
+    // ดึงเวลาปัจจุบันในรูปแบบ "HH:mm:ss"
+    const currentTime = now.toLocaleTimeString("en-US", {
+      hour12: false,
+      timeZone: "Asia/Bangkok",
+    });
+
+    // ดึงลอตเตอรี่ทั้งหมด
+    const lotteries = await prisma.lottery.findMany();
+
+    // กรองข้อมูลลอตเตอรี่ที่เปิดอยู่
+    const activeLotteries = lotteries.filter((lottery) => {
+      const openDays = lottery.openDays; // ค่านี้เป็น JSON
+      return (
+        Array.isArray(openDays) &&
+        openDays.includes(currentDay) && // ตรวจสอบวัน
+        lottery.openTime <= currentTime && // ตรวจสอบเวลาเปิด
+        lottery.closeTime >= currentTime   // ตรวจสอบเวลาปิด
+      );
+    });
+
+    const targetName = "Lotto A"; // ชื่อที่ต้องการค้นหา
+    const exists = activeLotteries.some((lottery) => lottery.name === targetName);
+
+    if (exists) {
+      console.log(`มีลอตเตอรี่ชื่อ ${targetName} ในรายการ activeLotteries`);
+    } else {
+      console.log(`ไม่มีลอตเตอรี่ชื่อ ${targetName} ในรายการ activeLotteries`);
+    }
+
+    res.status(200).json({ activeLotteries });
+  } catch (error) {
+    console.error("Error fetching active lotteries:", error);
+    res.status(500).json({ error: "Error fetching active lotteries" });
   }
 };

@@ -1,0 +1,4 @@
+
+.codegpt
+/server/prisma/*
+/server/.env

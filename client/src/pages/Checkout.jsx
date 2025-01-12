@@ -86,9 +86,14 @@ const BettingList = () => {
                       <td className="border border-gray-300 p-2 text-right  ">
                         {bet.amount}
                       </td>
-                      <td className="border border-gray-300 p-2 text-right  flex justify-center">
-                        <h2 className="ml-2">ถูกรางวัล</h2>
-                        <button className="ml-2">ดู</button>
+                      <td className="border border-gray-300 p-2 text-right flex justify-center">
+                        {bet.resultId === 1 ? (
+                          <h2 className="ml-2 text-green-500">ถูกรางวัล</h2>
+                        ) : bet.resultId === 0 ? (
+                          <h2 className="ml-2 text-red-500">ไม่ถูกรางวัล</h2>
+                        ) : (
+                          <h2 className="ml-2 text-gray-500">ยังไม่ประกาศ</h2>
+                        )}
                       </td>
                       <td className="border border-gray-300 p-2 text-right">
                         <h2 className="ml-2">90 ฿</h2>

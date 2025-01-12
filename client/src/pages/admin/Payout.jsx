@@ -34,10 +34,24 @@ const Payout = () => {
 
   const fetchLoto = async (token) => {
     try {
-      const res = await fetchLotteriesAPI(token); // เรียก API รายการ Loto
-      setLotteryList(res.data); // เก็บข้อมูลใน State
+      const res = await fetchLotteriesAPI(token);
+      console.log("API Response:", res);
+  
+      if (res?.data?.lotteries) {
+        // กรองเฉพาะ id และ name
+        const simplifiedLotteries = res.data.lotteries.map((lotto) => ({
+          id: lotto.id,
+          name: lotto.name,
+        }));
+  
+        console.log("Simplified Lotteries:", simplifiedLotteries);
+        setLotteryList(simplifiedLotteries); // อัปเดต state
+      } else {
+        throw new Error("ไม่มีข้อมูลหวยที่ใช้งาน");
+      }
     } catch (error) {
       console.log("Error fetching Loto list:", error);
+      toast.error("ไม่สามารถดึงข้อมูลหวยได้");
     }
   };
 

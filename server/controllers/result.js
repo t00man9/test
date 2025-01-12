@@ -1,3 +1,4 @@
+const { Eraser } = require("lucide-react");
 const prisma = require("../config/prisma");
 
 // exports.addResult = async (req, res) => {
@@ -66,6 +67,43 @@ exports.listResult = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.log(err);
+    res.status(500).json({ error: err.message });
+  }
+};
+
+exports.checkReward = async (req, res) => {
+  try {
+    // ดึงข้อมูล result และ bet จากฐานข้อมูล
+    const results = await prisma.result.findMany();
+    const bets = await prisma.bet.findMany();
+
+    // ลูปตรวจสอบ bet แต่ละรายการ
+    const updatedBets = [];
+    for (const bet of bets) {
+      // ค้นหา result ที่ตรงกับ groupLotto และ gameType
+      const matchedResult = results.find(
+        (result) =>
+          bet.groupLotto === result.lotteryName && // ตรวจสอบ groupLotto == lotteryName
+          bet.gameType === "3 ตัวบน" && // ตรวจสอบ gameType
+          bet.number === result.threeDigit // ตรวจสอบ number == threeDigit
+      );
+
+      if (matchedResult) {
+        // บันทึก resultId ใน bet
+        const updatedBet = await prisma.bet.update({
+          where: { id: bet.id },
+          data: { resultId: matchedResult.id },
+        });
+
+        // เพิ่ม bet ที่อัปเดตลงในอาร์เรย์
+        updatedBets.push(updatedBet);
+      }
+    }
+
+    // ส่งข้อมูล bet ที่อัปเดตกลับ
+    res.json({ message: "Bet results updated", updatedBets });
+  } catch (err) {
+    console.log("Error:", err);
     res.status(500).json({ error: err.message });
   }
 };

@@ -17,6 +17,14 @@ export const fetchLotteriesAPI = async (token) => {
   });
 };
 
+export const fetchLotteriesAPIActive = async (token) => {
+  return axios.get("http://localhost:3001/api/totteries/active", {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+};
+
 export const updateLoto = async (token, id, form) => {
   return axios.put(`http://localhost:3001/api/totteries/${id}`, form, {
     headers: {

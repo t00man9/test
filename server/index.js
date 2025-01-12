@@ -21,10 +21,10 @@ readdirSync("./routes").map((route) =>
 );
 
 // รันทุกนาทีเพื่อตรวจสอบสถานะหวย
-cron.schedule("* * * * *", async () => {
-  console.log("Checking lottery status...");
-  await updateLotteryStatus();
-});
+// cron.schedule("* * * * *", async () => {
+//   console.log("Checking lottery status...");
+//   await updateLotteryStatus();
+// });
 
 // Start server
 app.listen(3001, async () => {
